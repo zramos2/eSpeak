@@ -1,0 +1,108 @@
+# project: dowjones monitoring automation
+# enhancements
+# 2 do not display the stdout of curl
+# stdout is stream 1
+# stderr is stream 2
+# stdin is stream 0
+# initialization
+   echo "running $0 script"; sleep 1
+
+# declaration
+   let OLDVAL=0
+   let CURRVAL=0
+   let DIFFERENCE=0
+   let DELAYP1=0
+   HH=""
+   MM=""
+
+# pre processing
+
+    # check if parameters are passed
+    if (( $# == 0 ))
+    then
+       echo   "no parameters are passed"
+       echo "$0 accept parameters as follows"
+       echo "delay in while loop"
+       echo "espeak language en fr ge it"
+       echo "espeak voice f1 m1"
+       echo "espeak volume 0-200"
+       echo "exiting script"
+       exit 1
+    fi
+
+    # accept parameters as
+    DELAYP1=$1   # in seconds
+    LANGP2=$2    # en/fr/it/ge/es
+    VOICEP3=$3   # croak/whisper/m1-7/f1-5
+    VOLUMEP4=$4  # 0 to 200
+
+# main processing
+   while :
+   do
+      #get hours and minutes
+      HH=$(date +%H)
+      MM=$(date +%M)
+
+        # run curl to generate output contailing market data
+        curl -o $0.curl https://www.marketwatch.com/investing/future/djia%20futures 1> /dev/null
+
+        # extract and espeak market data
+        CURRVAL=$(cat $0.curl | grep price | grep content | awk -F'content=' '{print $2}' | head -1 | awk -F'"' '{print $2}'| awk -F',' '{print $1$2}')
+        espeak -a $VOLUMEP4 -v${LANGP2}+${VOICEP3} "market value is $CURRVAL"
+
+        #save market value to history
+        echo "market value $CURRVAL" >> $0.history
+
+        # compare market value with old
+        DATETIME=$(date)
+        (( DIFFERENCE = $CURRVAL - $OLDVAL ))
+        if (( $CURRVAL > $OLDVAL ))
+        then
+           echo "CURRVAL $CURRVAL is greater then OLDVAL $OLDVAL"
+           #echo "increase by $DIFFERENCE points"
+           echo "time is now ${HH}:${MM} increase by $DIFFERENCE points"
+           espeak -ven+m1 "time is now ${HH}:${MM} increase by $DIFFERENCE points"
+        elif (( $CURRVAL < $OLDVAL ))
+        then
+           echo "CURRVAL $CURRVAL is less then OLDVAL $OLDVAL"
+           echo "decrease by $DIFFERENCE points"
+           espeak -ven+f1 "time is now ${HH}:${MM} decrease by $DIFFERENCE points"
+        else
+           echo "CURRVAL $CURRVAL is equal to OLDVAL $OLDVAL"
+           echo "time is now ${HH}:${MM} no change "
+           echo "$CURRVAL 0 $DATETIME" >> $0.trend
+        fi
+        echo "$CURRVAL $DIFFERENCE $DELAYP1 $DATETIME" >> $0.trend
+        # test data for alarms
+        # if current market data satisfies then alarm
+
+        # save data
+        #save market data that triggers the alarm
+
+        # Save current market value as old value
+        OLDVAL=$CURRVAL
+
+        # Sleep interval
+        if (( $DIFFERENCE < -10 )) || (( $DIFFERENCE > 10 ))
+        then
+           (( DELAYP1 = $DELAYP1 - ( $DELAYP1 / 2 ) ))
+        else
+           (( DELAYP1 = $DELAYP1 + 5 ))
+        fi
+        echo "Next polling in $DELAYP1 seconds"
+        sleep $DELAYP1
+
+   done
+
+  # post processing
+        # show data accumulated
+   set +x
+
+  # cleanup
+        exit 0
+
+  # feedback
+  # data
+  # authors
+  # contributors
+  # recent runtime error
